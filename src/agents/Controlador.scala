@@ -45,7 +45,7 @@ class Controlador(system: ActorSystem) extends Agent {
         val selecionado = Random.shuffle(transacoes.filter(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisCompras.maxWhisker).toList).take(1)(0)
         val transacoesSel = transacoes.filter(e => e.idPortador == selecionado.idPortador)
         println(selecionado)
-        val portador = system.actorOf(Props(new Portador(estGlobaisFinal, transacoesSel)), name = "portador-" + selecionado.idPortador)
+        val portador = system.actorOf(Props(new Portador(estGlobaisFinal, transacoesSel, vlCorte)), name = "portador-" + selecionado.idPortador)
         portador ! ACLMessage(Map((ACLMessageParameter.PERFORMATIVE -> Performative.REQUEST),
           (ACLMessageParameter.SENDER -> this.self),
           (ACLMessageParameter.RECEIVER -> portador),
@@ -57,7 +57,7 @@ class Controlador(system: ActorSystem) extends Agent {
   }
 
   def gerarEstatisticasGlobais(transacoes: Array[TransacaoCPGF]): Array[BoxPlotMarks] = {
-    GeraEstatisticas.gerarEstatisticasGlobais(transacoes)
+    GeraEstatisticas.gerarEstatisticasTransacoes(transacoes)
   }
 
   def startBehavior(file: String): Array[TransacaoCPGF] = {

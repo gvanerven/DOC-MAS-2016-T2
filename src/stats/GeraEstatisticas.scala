@@ -5,7 +5,7 @@ import org.apache.commons.math3.ml.clustering._
 import org.apache.commons.math3.stat.descriptive.{ DescriptiveStatistics, _ }
 
 object GeraEstatisticas {
-  def gerarEstatisticasGlobais(transacoes: Array[TransacaoCPGF]): Array[BoxPlotMarks] = {
+  def gerarEstatisticasTransacoes(transacoes: Array[TransacaoCPGF]): Array[BoxPlotMarks] = {
     val transacoesSAQUES = transacoes.filter(_.tipoTransacao.contains("SAQUE"))
     val transacoesCOMPRAS = transacoes.filter(!_.tipoTransacao.contains("SAQUE"))
     val stSAQUE = calcBoxPlotVals(new DescriptiveStatistics(transacoesSAQUES.map(_.valorTransacao)))
