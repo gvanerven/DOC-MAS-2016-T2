@@ -1,1 +1,21 @@
+<<<<<<< HEAD
 /bin/
+=======
+*.class
+*.log
+
+# sbt specific
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+>>>>>>> branch 'master' of https://github.com/gvanerven/DOC-MAS-2016-T2.git
