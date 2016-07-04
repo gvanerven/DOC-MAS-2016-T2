@@ -11,28 +11,38 @@ import stats._
 import scala.util.Random
 
 class Controlador(system: ActorSystem) extends Agent {
-  var transacoesSAQUES: Array[TransacaoCPGF] = Array[TransacaoCPGF]()
-  var transacoesCOMPRAS: Array[TransacaoCPGF] = Array[TransacaoCPGF]()
+  var index = 0
+  var numAtivos = 0
+  //change to use Options
+  var transacoes: Array[TransacaoCPGF] = null
+  var estGlobaisFinal: EstatisticasTransacoes = null
+  var selecionados: Array[String] = null
+  val vlCorte = 800.0
 
+  def max(a: Double, b: Double): Double = {
+    if(a > b) a else b
+  }
+  
   def receive = {
     case msg: ACLMessage =>
       if (msg.sender == system.deadLetters && msg.performative == Performative.REQUEST) {
-        val vlCorte = 800.0
-        val transacoes = startBehavior(msg.content.toString())
+        transacoes = startBehavior(msg.content.toString())
+        val saques = transacoes.filter(e => e.tipoTransacao.contains("SAQUE"))
+        val compras = transacoes.filter(e => !e.tipoTransacao.contains("SAQUE"))
         //println(transacoes.length)
         val estatisticasGlobais = gerarEstatisticasGlobais(transacoes)
         val estGlobaisSaques = estatisticasGlobais(0)
         val estGlobaisCompras = estatisticasGlobais(1)
         val perSaques = (100 * estGlobaisSaques.totalElements) / (100 * (estGlobaisSaques.totalElements + estGlobaisCompras.totalElements))
         val perCompras = (100 * estGlobaisCompras.totalElements) / (100 * (estGlobaisSaques.totalElements + estGlobaisCompras.totalElements))
-        val perOutSaquesBaixo = (100 * transacoes.count(e => e.tipoTransacao.contains("SAQUE") && e.valorTransacao < estGlobaisSaques.minWhisker)) / (100 * estGlobaisSaques.totalElements)
-        val perOutSaquesAlto = (100 * transacoes.count(e => e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisSaques.maxWhisker)) / (100 * estGlobaisSaques.totalElements)
+        val perOutSaquesBaixo = (100 * saques.count(e => e.valorTransacao < estGlobaisSaques.minWhisker)) / (100 * max(estGlobaisSaques.totalElements,1))
+        val perOutSaquesAlto = (100 * saques.count(e => e.valorTransacao > estGlobaisSaques.maxWhisker)) / (100 * max(estGlobaisSaques.totalElements,1))
         //println(transacoes.filter(_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > estGlobaisSaques.maxWhisker))
-        val perOutComprasBaixo = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao < estGlobaisCompras.minWhisker)) / (100 * estGlobaisCompras.totalElements)
-        val perOutComprasAlto = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisCompras.maxWhisker)) / (100 * estGlobaisCompras.totalElements)
-        val perOpComprasCorte = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > vlCorte)) / (100 * estGlobaisCompras.totalElements)
+        val perOutComprasBaixo = (100 * compras.count(e => e.valorTransacao < estGlobaisCompras.minWhisker)) / (100 * max(estGlobaisCompras.totalElements,1))
+        val perOutComprasAlto = (100 * compras.count(e => e.valorTransacao > estGlobaisCompras.maxWhisker)) / (100 * max(estGlobaisCompras.totalElements,1))
+        val perOpComprasCorte = (100 * compras.count(e => e.valorTransacao > vlCorte)) / (100 * max(estGlobaisCompras.totalElements,1))
         //println(transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > vlCorte))
-        val estGlobaisFinal = EstatisticasTransacoes(perSaques,
+        estGlobaisFinal = EstatisticasTransacoes(perSaques,
           perCompras,
           perOutSaquesBaixo,
           perOutSaquesAlto,
@@ -42,20 +52,39 @@ class Controlador(system: ActorSystem) extends Agent {
           estGlobaisSaques,
           estGlobaisCompras)
         println("Estatisticas finais: " + estGlobaisFinal)
-        val selecionados = Random.shuffle(transacoes.filter(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisCompras.maxWhisker).toList).take(5)
-        for(selecionado <- selecionados){
-          val transacoesSel = transacoes.filter(e => e.idPortador == selecionado.idPortador)
-          println(selecionado)
-          val portador = system.actorOf(Props(new Portador(estGlobaisFinal, transacoesSel, vlCorte)), name = "portador-" + selecionado.idPortador)
-          portador ! ACLMessage(Map((ACLMessageParameter.PERFORMATIVE -> Performative.REQUEST),
-            (ACLMessageParameter.SENDER -> this.self),
-            (ACLMessageParameter.RECEIVER -> portador),
-            (ACLMessageParameter.CONTENT -> "verifica-culpa")))
+        //val selecionados = Random.shuffle(compras.filter(e => e.valorTransacao > estGlobaisCompras.maxWhisker).toList).take(5)
+        selecionados = compras.filter(e => e.valorTransacao > estGlobaisCompras.maxWhisker).map(e => e.idPortador).distinct
+        portadores()
+
+      } else if (msg.sender.toString().contains("portador") && msg.performative == Performative.INFORM) {
+        println(msg.sender.toString.split("/")(4)  + " declarou-se " + msg.content.toString)
+        numAtivos -= 1
+        if (numAtivos == 0) {
+          if (index < (selecionados.length - 1)) {
+            portadores()
+          } else {
+            system.shutdown()
+          }
         }
-      }else if (msg.sender.toString().contains("portador") && msg.performative == Performative.INFORM){
-        println(msg.sender + " declarou-se " + msg.content.toString)
-        system.shutdown()
-      }      
+      }
+  }
+
+  def portadores(acc: Int = 0) { //refact to make functional
+    if(acc < 2 && index < (selecionados.length - 1)){
+      iniciaPortadores(selecionados(index))
+      index += 1
+      numAtivos += 1
+      portadores(acc + 1)
+    }    
+  }
+
+  def iniciaPortadores(selecionado: String) {
+    val transacoesSel = transacoes.filter(e => e.idPortador == selecionado)
+    val portador = system.actorOf(Props(new Portador(estGlobaisFinal, transacoesSel, vlCorte)), name = "portador-" + selecionado)
+    portador ! ACLMessage(Map((ACLMessageParameter.PERFORMATIVE -> Performative.REQUEST),
+      (ACLMessageParameter.SENDER -> this.self),
+      (ACLMessageParameter.RECEIVER -> portador),
+      (ACLMessageParameter.CONTENT -> "verifica-culpa")))
   }
 
   def gerarEstatisticasGlobais(transacoes: Array[TransacaoCPGF]): Array[BoxPlotMarks] = {
