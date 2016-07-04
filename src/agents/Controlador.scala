@@ -19,19 +19,19 @@ class Controlador(system: ActorSystem) extends Agent {
       if (msg.sender == system.deadLetters && msg.performative == Performative.REQUEST) {
         val vlCorte = 800.0
         val transacoes = startBehavior(msg.content.toString())
-        println(transacoes.length)
+        //println(transacoes.length)
         val estatisticasGlobais = gerarEstatisticasGlobais(transacoes)
         val estGlobaisSaques = estatisticasGlobais(0)
         val estGlobaisCompras = estatisticasGlobais(1)
         val perSaques = (100 * estGlobaisSaques.totalElements) / (100 * (estGlobaisSaques.totalElements + estGlobaisCompras.totalElements))
         val perCompras = (100 * estGlobaisCompras.totalElements) / (100 * (estGlobaisSaques.totalElements + estGlobaisCompras.totalElements))
-        val perOutSaquesBaixo = (100 * transacoes.filter(_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao < estGlobaisSaques.minWhisker)) / (100 * estGlobaisSaques.totalElements)
-        val perOutSaquesAlto = (100 * transacoes.filter(_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > estGlobaisSaques.maxWhisker)) / (100 * estGlobaisSaques.totalElements)
-        println(transacoes.filter(_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > estGlobaisSaques.maxWhisker))
-        val perOutComprasBaixo = (100 * transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao < estGlobaisCompras.minWhisker)) / (100 * estGlobaisCompras.totalElements)
-        val perOutComprasAlto = (100 * transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > estGlobaisCompras.maxWhisker)) / (100 * estGlobaisCompras.totalElements)
-        val perOpComprasCorte = (100 * transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > vlCorte)) / (100 * estGlobaisCompras.totalElements)
-        println(transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > vlCorte))
+        val perOutSaquesBaixo = (100 * transacoes.count(e => e.tipoTransacao.contains("SAQUE") && e.valorTransacao < estGlobaisSaques.minWhisker)) / (100 * estGlobaisSaques.totalElements)
+        val perOutSaquesAlto = (100 * transacoes.count(e => e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisSaques.maxWhisker)) / (100 * estGlobaisSaques.totalElements)
+        //println(transacoes.filter(_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > estGlobaisSaques.maxWhisker))
+        val perOutComprasBaixo = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao < estGlobaisCompras.minWhisker)) / (100 * estGlobaisCompras.totalElements)
+        val perOutComprasAlto = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisCompras.maxWhisker)) / (100 * estGlobaisCompras.totalElements)
+        val perOpComprasCorte = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > vlCorte)) / (100 * estGlobaisCompras.totalElements)
+        //println(transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > vlCorte))
         val estGlobaisFinal = EstatisticasTransacoes(perSaques,
           perCompras,
           perOutSaquesBaixo,
@@ -41,15 +41,17 @@ class Controlador(system: ActorSystem) extends Agent {
           perOpComprasCorte,
           estGlobaisSaques,
           estGlobaisCompras)
-        println(estGlobaisFinal)
-        val selecionado = Random.shuffle(transacoes.filter(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisCompras.maxWhisker).toList).take(1)(0)
-        val transacoesSel = transacoes.filter(e => e.idPortador == selecionado.idPortador)
-        println(selecionado)
-        val portador = system.actorOf(Props(new Portador(estGlobaisFinal, transacoesSel, vlCorte)), name = "portador-" + selecionado.idPortador)
-        portador ! ACLMessage(Map((ACLMessageParameter.PERFORMATIVE -> Performative.REQUEST),
-          (ACLMessageParameter.SENDER -> this.self),
-          (ACLMessageParameter.RECEIVER -> portador),
-          (ACLMessageParameter.CONTENT -> "verifica-culpa")))
+        println("Estatisticas finais: " + estGlobaisFinal)
+        val selecionados = Random.shuffle(transacoes.filter(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > estGlobaisCompras.maxWhisker).toList).take(5)
+        for(selecionado <- selecionados){
+          val transacoesSel = transacoes.filter(e => e.idPortador == selecionado.idPortador)
+          println(selecionado)
+          val portador = system.actorOf(Props(new Portador(estGlobaisFinal, transacoesSel, vlCorte)), name = "portador-" + selecionado.idPortador)
+          portador ! ACLMessage(Map((ACLMessageParameter.PERFORMATIVE -> Performative.REQUEST),
+            (ACLMessageParameter.SENDER -> this.self),
+            (ACLMessageParameter.RECEIVER -> portador),
+            (ACLMessageParameter.CONTENT -> "verifica-culpa")))
+        }
       }else if (msg.sender.toString().contains("portador") && msg.performative == Performative.INFORM){
         println(msg.sender + " declarou-se " + msg.content.toString)
         system.shutdown()
