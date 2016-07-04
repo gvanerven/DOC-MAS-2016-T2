@@ -11,6 +11,7 @@ import stats._
 import scala.util.Random
 
 class Controlador(system: ActorSystem) extends Agent {
+  val MAX_SIM = 2
   var index = 0
   var numAtivos = 0
   //change to use Options
@@ -56,21 +57,20 @@ class Controlador(system: ActorSystem) extends Agent {
         selecionados = compras.filter(e => e.valorTransacao > estGlobaisCompras.maxWhisker).map(e => e.idPortador).distinct
         portadores()
 
-      } else if (msg.sender.toString().contains("portador") && msg.performative == Performative.INFORM) {
+      } else if (msg.sender.toString().contains("portador") && msg.performative == Performative.INFORM) { //holder agents' messages
+        
         println(msg.sender.toString.split("/")(4)  + " declarou-se " + msg.content.toString)
         numAtivos -= 1
-        if (numAtivos == 0) {
-          if (index < (selecionados.length - 1)) {
-            portadores()
-          } else {
-            system.shutdown()
-          }
-        }
+        if (index < selecionados.length && numAtivos < MAX_SIM) {
+          portadores()
+        } else if(numAtivos <= 0){
+          system.shutdown()
+        }        
       }
   }
 
   def portadores(acc: Int = 0) { //refact to make functional
-    if(acc < 2 && index < (selecionados.length - 1)){
+    if(acc < MAX_SIM && index < selecionados.length){
       iniciaPortadores(selecionados(index))
       index += 1
       numAtivos += 1
