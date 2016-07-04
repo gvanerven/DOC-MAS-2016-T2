@@ -44,6 +44,7 @@ class Portador(estatisticasGlobais: EstatisticasTransacoes, transacoes: Array[Tr
       val perOutComprasBaixoLG = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao < bpmCompras.minWhisker)) / (100 * estLocaisCompras.totalElements)
       val perOutComprasAltoLG = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > bpmCompras.maxWhisker)) / (100 * estLocaisCompras.totalElements)
       val perOpComprasCorteLG = (100 * transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > vlCorte)) / (100 * estLocaisCompras.totalElements)
+      println(this.self + "->" + transacoes.count(e => !e.tipoTransacao.contains("SAQUE") && e.valorTransacao > bpmCompras.maxWhisker))
       val estLGFinal = EstatisticasTransacoes(
         perSaquesLG,
         perComprasLG,
@@ -54,7 +55,7 @@ class Portador(estatisticasGlobais: EstatisticasTransacoes, transacoes: Array[Tr
         perOpComprasCorteLG,
         estLocaisSaques,
         estLocaisCompras)        
-      println(estLGFinal)
+      println(this.self + ":" + estLGFinal)
       
       val score = (perSaques +  perCompras + perOutSaquesBaixo + perOutSaquesAlto + perOutComprasBaixo + perOutComprasAlto + perOpComprasCorteLG)/7
       val reply = if(score >= 1.5) { println(estLGFinal); msg.reply(Performative.INFORM, "culpado")} else {msg.reply(Performative.INFORM, "inocente")}
