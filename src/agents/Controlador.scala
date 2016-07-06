@@ -8,10 +8,12 @@ import java.util.GregorianCalendar
 import org.apache.commons.math3.ml.clustering._
 import org.apache.commons.math3.stat.descriptive.{ DescriptiveStatistics, _ }
 import stats._
-import scala.util.Random
+//import scala.util.Random
+import java.io._
 
 class Controlador(system: ActorSystem) extends Agent {
   val MAX_SIM = 2
+  var totalDecCulp = 0
   var index = 0
   var numAtivos = 0
   //change to use Options
@@ -19,11 +21,13 @@ class Controlador(system: ActorSystem) extends Agent {
   var estGlobaisFinal: EstatisticasTransacoes = null
   var selecionados: Array[String] = null
   val vlCorte = 800.0
-
-  def max(a: Double, b: Double): Double = {
-    if(a > b) a else b
-  }
+  val file = new File("K:\\SMA-T2\\dados\\cartao\\output.txt")
+  val bw = new BufferedWriter(new FileWriter(file))
   
+  def max(a: Double, b: Double): Double = {
+    if (a > b) a else b
+  }
+
   def receive = {
     case msg: ACLMessage =>
       if (msg.sender == system.deadLetters && msg.performative == Performative.REQUEST) {
@@ -36,12 +40,12 @@ class Controlador(system: ActorSystem) extends Agent {
         val estGlobaisCompras = estatisticasGlobais(1)
         val perSaques = (100 * estGlobaisSaques.totalElements) / (100 * (estGlobaisSaques.totalElements + estGlobaisCompras.totalElements))
         val perCompras = (100 * estGlobaisCompras.totalElements) / (100 * (estGlobaisSaques.totalElements + estGlobaisCompras.totalElements))
-        val perOutSaquesBaixo = (100 * saques.count(e => e.valorTransacao < estGlobaisSaques.minWhisker)) / (100 * max(estGlobaisSaques.totalElements,1))
-        val perOutSaquesAlto = (100 * saques.count(e => e.valorTransacao > estGlobaisSaques.maxWhisker)) / (100 * max(estGlobaisSaques.totalElements,1))
+        val perOutSaquesBaixo = (100 * saques.count(e => e.valorTransacao < estGlobaisSaques.minWhisker)) / (100 * max(estGlobaisSaques.totalElements, 1))
+        val perOutSaquesAlto = (100 * saques.count(e => e.valorTransacao > estGlobaisSaques.maxWhisker)) / (100 * max(estGlobaisSaques.totalElements, 1))
         //println(transacoes.filter(_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > estGlobaisSaques.maxWhisker))
-        val perOutComprasBaixo = (100 * compras.count(e => e.valorTransacao < estGlobaisCompras.minWhisker)) / (100 * max(estGlobaisCompras.totalElements,1))
-        val perOutComprasAlto = (100 * compras.count(e => e.valorTransacao > estGlobaisCompras.maxWhisker)) / (100 * max(estGlobaisCompras.totalElements,1))
-        val perOpComprasCorte = (100 * compras.count(e => e.valorTransacao > vlCorte)) / (100 * max(estGlobaisCompras.totalElements,1))
+        val perOutComprasBaixo = (100 * compras.count(e => e.valorTransacao < estGlobaisCompras.minWhisker)) / (100 * max(estGlobaisCompras.totalElements, 1))
+        val perOutComprasAlto = (100 * compras.count(e => e.valorTransacao > estGlobaisCompras.maxWhisker)) / (100 * max(estGlobaisCompras.totalElements, 1))
+        val perOpComprasCorte = (100 * compras.count(e => e.valorTransacao > vlCorte)) / (100 * max(estGlobaisCompras.totalElements, 1))
         //println(transacoes.filter(!_.tipoTransacao.contains("SAQUE")).count(e => e.valorTransacao > vlCorte))
         estGlobaisFinal = EstatisticasTransacoes(perSaques,
           perCompras,
@@ -58,24 +62,34 @@ class Controlador(system: ActorSystem) extends Agent {
         portadores()
 
       } else if (msg.sender.toString().contains("portador") && msg.performative == Performative.INFORM) { //holder agents' messages
-        
-        println(msg.sender.toString.split("/")(4)  + " declarou-se " + msg.content.toString)
+
+        //println(msg.sender.toString.split("/")(4)  + " declarou-se " + msg.content.toString)
+        if (msg.content.toString == "culpado") {
+          totalDecCulp = totalDecCulp + 1
+        }
+        bw.write(msg.sender.toString.split("/")(4) + " declarou-se " + msg.content.toString)
+        bw.newLine()
+
         numAtivos -= 1
         if (index < selecionados.length && numAtivos < MAX_SIM) {
           portadores()
-        } else if(numAtivos <= 0){
+        } else if (numAtivos <= 0) {
+          bw.write("Total declarado culpado: " + totalDecCulp)
+          bw.newLine()
+          bw.write("Total consultados: " + selecionados.length)
+          bw.close()
           system.shutdown()
-        }        
+        }
       }
   }
 
   def portadores(acc: Int = 0) { //refact to make functional
-    if(acc < MAX_SIM && index < selecionados.length){
+    if (acc < MAX_SIM && index < selecionados.length) {
       iniciaPortadores(selecionados(index))
       index += 1
       numAtivos += 1
       portadores(acc + 1)
-    }    
+    }
   }
 
   def iniciaPortadores(selecionado: String) {

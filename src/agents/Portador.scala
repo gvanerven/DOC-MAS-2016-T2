@@ -64,7 +64,7 @@ class Portador(estatisticasGlobais: EstatisticasTransacoes, transacoes: Array[Tr
       val scoreG = perSaquesG +  perComprasG + perOutSaquesBaixoG + perOutSaquesAltoG + perOutComprasBaixoG + perOutComprasAlto + perOpComprasCorteG
       val score = scoreL + scoreG
       println(this.self.toString.split("/")(4) + " score: " + score)
-      val reply = if(score >= 0.5) { println(this.self.toString.split("/")(4) + estGFinal) ; msg.reply(Performative.INFORM, "culpado") } else { msg.reply(Performative.INFORM, "inocente") }
+      val reply = if(score >= 1.3) { println(this.self.toString.split("/")(4) + estGFinal) ; msg.reply(Performative.INFORM, "culpado") } else { msg.reply(Performative.INFORM, "inocente") }
       //println(reply.sender)
       //println(reply.receiver)
       reply.receiver ! reply
