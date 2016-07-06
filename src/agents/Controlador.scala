@@ -11,7 +11,7 @@ import stats._
 //import scala.util.Random
 import java.io._
 
-class Controlador(system: ActorSystem) extends Agent {
+class Controlador(system: ActorSystem, output: String) extends Agent {
   val MAX_SIM = 2
   var totalDecCulp = 0
   var index = 0
@@ -21,7 +21,7 @@ class Controlador(system: ActorSystem) extends Agent {
   var estGlobaisFinal: EstatisticasTransacoes = null
   var selecionados: Array[String] = null
   val vlCorte = 800.0
-  val file = new File("K:\\SMA-T2\\dados\\cartao\\output.txt")
+  val file = new File(output)
   val bw = new BufferedWriter(new FileWriter(file))
   
   def max(a: Double, b: Double): Double = {
